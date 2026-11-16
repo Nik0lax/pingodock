@@ -1,0 +1,10 @@
+# Ambiente e artefatos de build
+.venv/
+__pycache__/
+build/
+dist/
+
+# Dados pessoais da versão de desenvolvimento (caminhos, servidores, títulos de janelas)
+config.json
+dock.log
+selftest.log
