@@ -102,20 +102,6 @@ processo real na primeira vez que você abre o app por ele.
 Algo estranho? O arquivo `dock.log`, na mesma pasta, registra quando e por que o dock se escondeu e
 os erros de atualização — anexe-o ao abrir uma *issue*.
 
-## Atualizações automáticas (para quem distribui)
-
-Os docks instalados podem procurar versão nova numa pasta de rede ou endereço `http://`, a cada
-6 horas e cerca de 20 s depois de abrir. Quando há, aparece um aviso acima do dock e um clique
-atualiza e reabre o dock.
-
-1. Gere o instalador informando a pasta (ela fica gravada nele):
-   `.venv\Scripts\python.exe installer\build.py --update-source "\\servidor\TI\PingoDock"`
-2. Instale esse Setup nos PCs.
-3. Para publicar uma versão: aumente `APP_VERSION` no `dock.py`, rode o build de novo e copie
-   `dist\PingoDock-Setup-<versão>.exe` **e** `dist\latest.json` para a pasta.
-
-Endereços `https://` não são suportados (o pacote não leva as bibliotecas de SSL, para ficar menor).
-
 ## Desenvolvimento
 
 Feito em **Python 3.12** + **[PySide6](https://doc.qt.io/qtforpython-6/)** (Qt), com chamadas diretas
