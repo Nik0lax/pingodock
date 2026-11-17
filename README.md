@@ -41,7 +41,6 @@ do mesmo autor, que empresta o rosto para o ícone do app.
   borda de baixo) e some em vídeos, jogos e apresentações em tela cheia — mas continua aparecendo
   nos seus prints de tela.
 - **Leve**: cerca de 30 MB de memória, um processo só, instalação sem administrador.
-- **Atualização com um clique** quando há versão nova publicada (opcional).
 
 ![Pingo Dock no tema claro](docs/print-claro.png)
 
@@ -94,15 +93,14 @@ algumas opções só existem no arquivo:
 | Chave | Para quê |
 |---|---|
 | `"hotkey"` | Atalho de mostrar/esconder — ex.: `"Ctrl+Alt+D"`, `"Win+Shift+D"`, `"Ctrl+Alt+F9"` |
-| `"update_source"` | Pasta de rede ou endereço `http://` onde procurar versões novas |
 | `"apps"` | Os itens do dock, na ordem (dá para editar os nomes à mão) |
 
 A bolinha de "aberto" aparece quando o app tem alguma janela, mesmo minimizada. Para atalhos que
 abrem outro programa (lançadores, apps da Microsoft Store, Steam), o dock aprende sozinho qual é o
 processo real na primeira vez que você abre o app por ele.
 
-Algo estranho? O arquivo `dock.log`, na mesma pasta, registra quando e por que o dock se escondeu e
-os erros de atualização — anexe-o ao abrir uma *issue*.
+Algo estranho? O arquivo `dock.log`, na mesma pasta, registra quando e por que o dock se
+escondeu — anexe-o ao abrir uma *issue*.
 
 ## Desenvolvimento
 
