@@ -35,6 +35,7 @@ do mesmo autor, que empresta o rosto para o ícone do app.
 - **Lixeira** no fim do dock: arraste arquivos para ela; clique direito para esvaziar.
 - **Pastas com nome**, separadores e reordenação arrastando os ícones.
 - **Fundo desfocado** e **tema claro/escuro automático**, igual ao do Windows.
+- **Um dock em cada monitor**, se quiser: todos com os mesmos itens, sincronizados.
 - **Ctrl+Alt+D** mostra ou esconde o dock.
 - **Sai do caminho sozinho**: desce quando uma janela é maximizada (volta ao encostar o mouse na
   borda de baixo) e some em vídeos, jogos e apresentações em tela cheia — mas continua aparecendo
@@ -59,7 +60,7 @@ Requisitos: Windows 10 ou 11, 64 bits. Para desinstalar: *Configurações → Ap
 <summary>Instalação silenciosa (para vários PCs)</summary>
 
 ```
-PingoDock-Setup-1.2.0.exe /VERYSILENT /MERGETASKS="startup"
+PingoDock-Setup-1.3.0.exe /VERYSILENT /MERGETASKS="startup"
 ```
 
 Use `/MERGETASKS="!startup"` para não iniciar com o Windows.
@@ -79,6 +80,7 @@ Use `/MERGETASKS="!startup"` para não iniciar com o Windows.
 | Separar grupos de ícones | Clique direito → *Adicionar separador* |
 | Encurtar o nome de uma pasta | Clique direito → *Renomear…* |
 | Mostrar / esconder o dock | **Ctrl+Alt+D** |
+| Ter o dock nos dois (ou mais) monitores | Clique direito → *Mostrar em todas as telas* |
 | Mudar tema, desfoque, tamanho, ampliação | Clique direito no dock |
 
 **Dica:** para o visual ficar completo, ative *Ocultar automaticamente a barra de tarefas* em

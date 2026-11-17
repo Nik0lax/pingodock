@@ -11,6 +11,7 @@ Recursos:
   * solte um arquivo em cima de um app para abri-lo com esse app
   * clique direito num app: lista de janelas abertas e "Fechar"
   * Lixeira no fim do dock (soltar arquivos nela apaga; clique direito esvazia)
+  * um dock em cada monitor (clique direito → Mostrar em todas as telas)
   * Ctrl+Alt+D mostra/esconde o dock (configurável em "hotkey" no config.json)
   * fundo desfocado e tema claro/escuro acompanhando o Windows
   * aviso de versão nova (pasta/URL configurada em "update_source")
@@ -66,7 +67,7 @@ from PySide6.QtWidgets import (
 
 APP_NAME = "PingoDock"     # nome técnico: executável, pastas, registro
 APP_TITLE = "Pingo Dock"   # nome que aparece para o usuário
-APP_VERSION = "1.2.0"  # o build.py lê daqui a versão do instalador
+APP_VERSION = "1.3.0"  # o build.py lê daqui a versão do instalador
 FROZEN = getattr(sys, "frozen", False)  # rodando como PingoDock.exe (instalado)
 APP_DIR = Path(__file__).resolve().parent
 # Instalado, a pasta do programa pode não ser gravável: configuração e log vão
@@ -598,6 +599,7 @@ DEFAULT_CONFIG = {
     "magnify": True,
     "spacing": 8,
     "autohide": False,
+    "all_screens": False,   # um dock em cada monitor
     "theme": "auto",        # "auto" (segue o Windows), "dark" ou "light"
     "blur": True,           # fundo desfocado atrás do painel
     "hotkey": "Ctrl+Alt+D", # mostrar/esconder o dock
@@ -1146,8 +1148,112 @@ class BlurBehind(QWidget):
                                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
 
 
-class Dock(QWidget):
+class DockGroup:
+    """O que é comum a todos os docks (um por monitor, se "Mostrar em todas as
+    telas" estiver ligado): configuração, itens e ícones. Os docks compartilham
+    a mesma lista de itens, então o que muda num aparece nos outros.
+    O dock da tela principal é o "líder": registra o atalho de teclado, procura
+    atualizações e acompanha apps abertos e a Lixeira para todos."""
+
     def __init__(self) -> None:
+        self.cfg = load_config()
+        self.provider = QFileIconProvider()
+        self.icon_px = self.needed_icon_px()
+        self.items = [make_item(a, self.provider, self.icon_px) for a in self.cfg["apps"]]
+        if not self.cfg.get("trash_added"):
+            # Primeira vez com a Lixeira: entra no fim, depois de um separador.
+            if not any(it.is_trash for it in self.items):
+                if self.items and not self.items[-1].is_sep:
+                    self.items.append(Separator())
+                self.items.append(TrashItem(self.icon_px))
+            self.cfg["trash_added"] = True
+            self.save()
+        self.docks: list[Dock] = []
+        self._rebuild_timer: QTimer | None = None
+
+    @property
+    def leader(self) -> Dock | None:
+        return self.docks[0] if self.docks else None
+
+    def needed_icon_px(self) -> int:
+        """Maior tamanho (em pixels reais) em que um ícone é desenhado: ampliado ou
+        sendo arrastado, na tela de maior escala (125%, 150%...)."""
+        dpr = max((s.devicePixelRatio() for s in QGuiApplication.screens()), default=1.0)
+        biggest = float(self.cfg["icon_size"]) * max(float(self.cfg["magnification"]), 1.15)
+        return math.ceil(biggest * dpr)
+
+    def reload_icons(self) -> None:
+        px = self.needed_icon_px()
+        if px == self.icon_px:
+            return
+        self.icon_px = px
+        for it in self.items:
+            if not it.is_sep:
+                it.reload_icon(self.provider, px)
+        QTimer.singleShot(1000, trim_memory)
+
+    def save(self) -> None:
+        self.cfg["apps"] = [it.to_json() for it in self.items]
+        save_config(self.cfg)
+
+    # ---- um dock por tela ------------------------------------------------
+    def target_screens(self) -> list:
+        primary = QGuiApplication.primaryScreen()
+        if not self.cfg.get("all_screens"):
+            return [primary]
+        return [primary] + [s for s in QGuiApplication.screens() if s is not primary]
+
+    def build(self) -> None:
+        for screen in self.target_screens():
+            dock = Dock(self, screen)
+            self.docks.append(dock)
+            dock.show()
+
+    def close_docks(self) -> None:
+        docks, self.docks = self.docks, []
+        for dock in docks:
+            dock.shutdown()
+
+    def rebuild(self) -> None:
+        """Monitor ligado/desligado, tela principal trocada ou opção mudada: recria
+        os docks (com um pequeno atraso, porque o Windows avisa várias vezes)."""
+        if self._rebuild_timer is None:
+            self._rebuild_timer = QTimer(singleShot=True, interval=700, timeout=self._do_rebuild)
+        self._rebuild_timer.start()
+
+    def _do_rebuild(self) -> None:
+        self.close_docks()
+        self.build()
+        log(f"docks recriados: {len(self.docks)} tela(s)")
+
+    def watch_screens(self) -> None:
+        app = QGuiApplication.instance()
+        app.screenAdded.connect(lambda _s: self.rebuild())
+        app.screenRemoved.connect(lambda _s: self.rebuild())
+        app.primaryScreenChanged.connect(lambda _s: self.rebuild())
+
+    # ---- avisar os outros docks ------------------------------------------
+    def refresh(self, source: Dock | None = None) -> None:
+        """Itens mudaram (adicionar, remover, reordenar...): redesenha os outros docks."""
+        for dock in self.docks:
+            if dock is not source:
+                dock.reposition()
+                dock.last_state = None
+
+    def update_all(self) -> None:
+        for dock in self.docks:
+            dock.update()
+
+    def set_forced(self, value: str | None) -> None:
+        for dock in self.docks:
+            dock.forced = value
+            if value == "show" and not dock.isVisible():
+                dock.reveal = 0.0
+                dock.show()
+
+
+class Dock(QWidget):
+    def __init__(self, group: DockGroup | None = None, screen=None) -> None:
         super().__init__(
             None,
             Qt.WindowType.FramelessWindowHint
@@ -1160,19 +1266,13 @@ class Dock(QWidget):
         self.setAcceptDrops(True)
         self.setWindowTitle(APP_TITLE)
 
-        self.provider = QFileIconProvider()
-        self.cfg = load_config()
-        self.icon_px = self.needed_icon_px()
-        self.items = [make_item(a, self.provider, self.icon_px) for a in self.cfg["apps"]]
+        if group is None:  # dock avulso (autoteste, geração de prints)
+            group = DockGroup()
+            group.docks.append(self)
+        self.group = group
+        self.screen_ref = screen or QGuiApplication.primaryScreen()
+        self.setScreen(self.screen_ref)
         self.pressed_pixmap: QPixmap | None = None  # versão escurecida, só durante o clique
-        if not self.cfg.get("trash_added"):
-            # Primeira vez com a Lixeira: entra no fim, depois de um separador.
-            if not any(it.is_trash for it in self.items):
-                if self.items and not self.items[-1].is_sep:
-                    self.items.append(Separator())
-                self.items.append(TrashItem(self.icon_px))
-            self.cfg["trash_added"] = True
-            self.save()
 
         self.theme_name = self.resolve_theme()
         self.blur: BlurBehind | None = BlurBehind() if self.cfg["blur"] else None
@@ -1217,28 +1317,50 @@ class Dock(QWidget):
         self.cover_timer = QTimer(self, interval=300, timeout=self.check_cover)
         self.cover_timer.start()
 
-        QGuiApplication.primaryScreen().availableGeometryChanged.connect(self.reposition)
+        self.screen_ref.availableGeometryChanged.connect(self.reposition)
         self.reposition()
         # Terminada a carga (ícones em alta resolução, leitura de atalhos...),
         # devolve ao Windows a memória que só serviu para isso.
         QTimer.singleShot(3000, trim_memory)
 
-    def needed_icon_px(self) -> int:
-        """Maior tamanho (em pixels reais da tela) em que um ícone é desenhado:
-        ampliado pela lupa ou sendo arrastado, já com a escala do Windows (125% etc.)."""
-        dpr = QGuiApplication.primaryScreen().devicePixelRatio()
-        biggest = self.S * max(float(self.cfg["magnification"]), 1.15)
-        return math.ceil(biggest * dpr)
+    # ---- dados compartilhados entre os docks (ver DockGroup) -------------
+    @property
+    def cfg(self) -> dict:
+        return self.group.cfg
 
-    def reload_icons(self) -> None:
-        px = self.needed_icon_px()
-        if px == self.icon_px:
-            return
-        self.icon_px = px
-        for it in self.items:
-            if not it.is_sep:
-                it.reload_icon(self.provider, px)
-        QTimer.singleShot(1000, trim_memory)
+    @property
+    def items(self) -> list:
+        return self.group.items
+
+    @property
+    def provider(self) -> QFileIconProvider:
+        return self.group.provider
+
+    @property
+    def icon_px(self) -> int:
+        return self.group.icon_px
+
+    @property
+    def is_leader(self) -> bool:
+        return self.group.leader is self
+
+    def shutdown(self) -> None:
+        """Fecha este dock de vez (troca de monitores ou opção de telas)."""
+        for timer in (self.anim_timer, self.slow_timer, self.cover_timer):
+            timer.stop()
+        if self.hotkey_ok:
+            user32.UnregisterHotKey(int(self.winId()), HOTKEY_ID)
+            self.hotkey_ok = None
+        if self.blur is not None:
+            self.blur.close()
+            self.blur.deleteLater()
+            self.blur = None
+        try:
+            self.screen_ref.availableGeometryChanged.disconnect(self.reposition)
+        except (RuntimeError, TypeError):
+            pass
+        self.close()
+        self.deleteLater()
 
     # ---- tema e desfoque -----------------------------------------------
     def resolve_theme(self) -> str:
@@ -1268,7 +1390,7 @@ class Dock(QWidget):
     # ---- atalho de teclado (mostrar/esconder) ---------------------------
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        if self.hotkey_ok is None:
+        if self.hotkey_ok is None and self.is_leader:  # o atalho é global: um registro só
             self.register_hotkey()
 
     def register_hotkey(self) -> None:
@@ -1290,11 +1412,9 @@ class Dock(QWidget):
         return False, 0
 
     def toggle_visibility(self) -> None:
+        """Ctrl+Alt+D: esconde todos os docks se este estiver aparecendo; senão mostra todos."""
         showing = self.isVisible() and self.reveal > 0.5 and self.forced != "hide"
-        self.forced = "hide" if showing else "show"
-        if self.forced == "show" and not self.isVisible():
-            self.reveal = 0.0
-            self.show()
+        self.group.set_forced("hide" if showing else "show")
 
     # ---- atualizações ----------------------------------------------------
     def check_updates(self, manual: bool = False) -> None:
@@ -1359,7 +1479,7 @@ class Dock(QWidget):
         base_w = sum(widths) + (len(widths) - 1) * G + 2 * PAD_X
         w = int(base_w + S * (M - 1) * 3 + 240)
         h = int(S * M + S * 0.5 + PAD_BOTTOM + MARGIN_BOTTOM + 48)
-        avail = QGuiApplication.primaryScreen().availableGeometry()
+        avail = self.screen_ref.availableGeometry()
         w = min(w, avail.width())
         self.setGeometry(avail.x() + (avail.width() - w) // 2, avail.bottom() - h + 1, w, h)
         self.update()
@@ -1488,6 +1608,24 @@ class Dock(QWidget):
         return [hwnd for hwnd, _pid, name in windows if name in item.match_names]
 
     def slow_tick(self) -> None:
+        self.ticks += 1
+        changed = False
+        theme = self.resolve_theme()
+        if theme != self.theme_name:
+            self.theme_name = theme
+            changed = True
+        if self.blur is not None:
+            self.blur.stay_below(int(self.winId()))  # outra janela "sempre visível" pode ter entrado no meio
+        if self.banner and time.monotonic() > self.banner["until"]:
+            self.banner = None
+            changed = True
+        if changed:
+            self.update()
+        if self.is_leader and self.leader_tick():
+            self.group.update_all()  # itens são compartilhados: todos os docks redesenham
+
+    def leader_tick(self) -> bool:
+        """Trabalho feito uma vez só, pelo dock da tela principal, para todos."""
         windows = self.named_windows()
         changed = False
         for it in self.items:
@@ -1503,12 +1641,6 @@ class Dock(QWidget):
             if it.learn_t0 is not None:
                 changed |= self.try_learn(it, running, windows)
         changed |= self.retry_network_icons()
-
-        self.ticks += 1
-        theme = self.resolve_theme()
-        if theme != self.theme_name:
-            self.theme_name = theme
-            changed = True
         if self.ticks % 3 == 0:
             for it in self.items:
                 if it.is_trash:
@@ -1516,16 +1648,10 @@ class Dock(QWidget):
                     if full != it.full:
                         it.full = full
                         changed = True
-        if self.blur is not None:
-            self.blur.stay_below(int(self.winId()))  # outra janela "sempre visível" pode ter entrado no meio
         if time.monotonic() - self.update_last >= UPDATE_EVERY_SECS:
             self.check_updates()
         changed |= self.handle_update_result()
-        if self.banner and time.monotonic() > self.banner["until"]:
-            self.banner = None
-            changed = True
-        if changed:
-            self.update()
+        return changed
 
     def retry_network_icons(self) -> bool:
         """Recarrega os ícones cujos arquivos/pastas de rede voltaram a responder."""
@@ -1837,12 +1963,20 @@ class Dock(QWidget):
         self.reposition()
 
     def save(self) -> None:
-        self.cfg["apps"] = [it.to_json() for it in self.items]
-        save_config(self.cfg)
+        self.group.save()
+        self.group.refresh(source=self)  # os outros docks mostram a mudança
 
     def set_option(self, key: str, value) -> None:
         self.cfg[key] = value
-        self.save()
+        self.group.save()
+        if key == "all_screens":
+            self.group.rebuild()  # recria os docks (este inclusive) logo depois do menu fechar
+            return
+        self.group.reload_icons()  # tamanho dos ícones mudou → recarrega na resolução certa
+        for dock in self.group.docks:
+            dock.apply_option(key, value)
+
+    def apply_option(self, key: str, value) -> None:
         if key == "blur":
             if value and self.blur is None:
                 self.blur = BlurBehind()
@@ -1852,7 +1986,6 @@ class Dock(QWidget):
                 self.blur = None
         if key == "theme":
             self.theme_name = self.resolve_theme()
-        self.reload_icons()  # tamanho dos ícones mudou → recarrega na resolução certa
         self.reposition()
         self.last_state = None  # força redesenho (e reposicionar o desfoque)
 
@@ -1953,20 +2086,27 @@ class Dock(QWidget):
         blur.setChecked(self.blur is not None)
         blur.toggled.connect(lambda on: self.set_option("blur", on))
 
+        screens = menu.addAction("Mostrar em todas as telas")
+        screens.setCheckable(True)
+        screens.setChecked(bool(self.cfg.get("all_screens")))
+        screens.setEnabled(len(QGuiApplication.screens()) > 1 or bool(self.cfg.get("all_screens")))
+        screens.toggled.connect(lambda on: self.set_option("all_screens", on))
+
         startup = menu.addAction("Iniciar com o Windows")
         startup.setCheckable(True)
         startup.setChecked(startup_enabled())
         startup.toggled.connect(set_startup)
 
         menu.addSeparator()
+        lead = self.group.leader or self  # atalho e atualizações ficam com o dock principal
         hide_text = "Ocultar o Dock"
-        if self.hotkey_ok:
+        if lead.hotkey_ok:
             hide_text += f"\t{self.cfg['hotkey']}"
-        menu.addAction(hide_text, lambda: setattr(self, "forced", "hide"))
-        if self.update_info:
-            menu.addAction(f"Atualizar para a versão {self.update_info['version']}…", self.start_update)
+        menu.addAction(hide_text, lambda: self.group.set_forced("hide"))
+        if lead.update_info:
+            menu.addAction(f"Atualizar para a versão {lead.update_info['version']}…", lead.start_update)
         elif update_source(self.cfg):
-            menu.addAction("Procurar atualizações", lambda: self.check_updates(manual=True))
+            menu.addAction("Procurar atualizações", lambda: lead.check_updates(manual=True))
         about = menu.addAction(f"{APP_TITLE} {APP_VERSION}")
         about.setEnabled(False)
         menu.addAction("Sair do Dock", QApplication.quit)
@@ -2054,8 +2194,9 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setQuitOnLastWindowClosed(False)
-    dock = Dock()
-    dock.show()
+    group = DockGroup()
+    group.build()          # um dock por tela (ou só na principal)
+    group.watch_screens()  # monitor ligado/desligado → reorganiza
     sys.exit(app.exec())
 
 
