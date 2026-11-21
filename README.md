@@ -1,146 +1,131 @@
 <p align="center">
-  <img src="docs/icone.png" width="112" alt="Ícone do Pingo Dock">
+  <img src="docs/icone.png" width="96" alt="Ícone do Pingo Dock">
 </p>
 
 <h1 align="center">Pingo Dock</h1>
 
 <p align="center">
-  <b>Um dock elegante para Windows — da família Pingo.</b><br>
-  Seus apps, pastas e links numa barra de vidro, com ícones que crescem quando o mouse passa.
+  Um Dock na base e uma barra de tarefas minimalista no topo do Windows.
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><b>⬇ Baixar o instalador</b></a> ·
-  <a href="#recursos">Recursos</a> ·
+  <a href="../../releases/latest"><b>Baixar o instalador</b></a> ·
+  <a href="#instalação">Instalação</a> ·
   <a href="#como-usar">Como usar</a> ·
-  <a href="#licença">Licença</a>
+  <a href="#desenvolvimento">Desenvolvimento</a>
 </p>
 
-![Pingo Dock no tema escuro, com o mouse sobre o Visual Studio Code](docs/print-escuro.png)
+![Pingo Dock 1.4 em execução, com a barra superior, o Dock e o guia de boas-vindas](docs/print-desktop-14.png)
 
----
+O **Pingo Dock 1.4** substitui visualmente a barra de tarefas do Windows enquanto está em execução. O Dock reúne os aplicativos fixados e abertos na base da tela. A barra superior concentra a data, a hora e os controles do sistema.
 
-## Por que "Pingo"?
+## O que mudou na versão 1.4
 
-Pingo é uma gota — e uma gota d'água funciona como lente: amplia o que está embaixo dela.
-É exatamente o que o dock faz com os ícones. O nome também vem do **Pingo**, o assistente virtual
-do mesmo autor, que empresta o rosto para o ícone do app.
+### Aplicativos e janelas no Dock
 
-## Recursos
+Aplicativos abertos aparecem automaticamente. Se o app estiver fixado, as janelas ficam agrupadas no próprio ícone. Passe o mouse sobre o ícone para ver as miniaturas e sobre uma miniatura para ampliá-la. **Só o clique traz a janela para frente.**
 
-- **Ampliação dos ícones** ao passar o mouse, com o nome do app e um "pulinho" ao abrir.
-- **Bolinha nos apps abertos** — clicar num app já aberto traz a janela dele para frente.
-- **Clique direito num app** lista as janelas abertas (para ir direto na certa) e tem **Fechar**.
-- **Solte um arquivo em cima de um app** para abri-lo com ele; solte entre os ícones para fixá-lo.
-- **Lixeira** no fim do dock: arraste arquivos para ela; clique direito para esvaziar.
-- **Pastas com nome**, separadores e reordenação arrastando os ícones.
-- **Fundo desfocado** e **tema claro/escuro automático**, igual ao do Windows.
-- **Um dock em cada monitor**, se quiser: todos com os mesmos itens, sincronizados.
-- **Ctrl+Alt+D** mostra ou esconde o dock.
-- **Sai do caminho sozinho**: desce quando uma janela é maximizada (volta ao encostar o mouse na
-  borda de baixo) e some em vídeos, jogos e apresentações em tela cheia — mas continua aparecendo
-  nos seus prints de tela.
-- **Leve**: cerca de 30 MB de memória, um processo só, instalação sem administrador.
+O **Iniciar** fica no começo do Dock. No fim, ficam **Explorador de Arquivos**, **Acessibilidade** e **Lixeira**. Esses ícones e os separadores que delimitam os grupos são fixos. O menu de Acessibilidade oferece Narrador, Lupa, Teclado Virtual e acesso às configurações do Windows.
 
-![Pingo Dock no tema claro](docs/print-claro.png)
+Quando um instalador informa o progresso, o Dock mostra uma barra abaixo do ícone e a porcentagem ao passar o mouse.
+
+![Miniaturas de duas janelas do Bloco de Notas e prévia ampliada de uma delas no Pingo Dock](docs/print-janelas-14.png)
+
+### Menu Iniciar
+
+Abra pelo primeiro ícone do Dock ou pressione a **tecla Windows sozinha**. Os aplicativos aparecem em ordem alfabética, com seus ícones e pastas expansíveis. A busca também encontra itens dentro das pastas.
+
+No rodapé aparecem a conta do usuário e os atalhos para **Configurações**, **Energia** e **Menu do Windows**. Atalhos como **Win+D** e **Win+E** continuam funcionando.
+
+<p align="center">
+  <img src="docs/print-iniciar-14.png" width="410" alt="Iniciar do Pingo Dock com busca, lista alfabética, pastas e atalhos no rodapé">
+</p>
+
+### Barra superior
+
+- **À esquerda**, bateria com porcentagem, Wi‑Fi, volume e Bluetooth. Clique no Wi‑Fi para ver as conexões disponíveis, no volume para ajustar o som por um controle vertical e no Bluetooth para abrir suas configurações.
+- **No centro**, dia da semana, data e hora.
+- **À direita**, a seta abre a bandeja de ícones promovidos e ocultos, incluindo aplicativos em segundo plano como o Wallpaper Engine quando registrado pelo Windows. O botão ao lado mostra a área de trabalho e um segundo clique restaura as janelas.
+
+A barra tem quatro estilos, **Transparente**, **Preto**, **Branco** e **Vidro fosco**. O controle de volume e a bandeja acompanham o estilo escolhido. O clique direito na barra superior abre o menu de contexto nativo do Windows.
+
+<p align="center">
+  <img src="docs/print-volume-14.png" width="227" alt="Controle vertical de volume ancorado abaixo do ícone na barra superior branca">
+  <img src="docs/print-bandeja-14.png" width="188" alt="Bandeja no tema branco aberta abaixo da seta da barra superior">
+</p>
 
 ## Instalação
 
-1. Baixe o `PingoDock-Setup-<versão>.exe` na [página de releases](../../releases/latest).
-2. Execute e siga o assistente. Ele instala só para o seu usuário (sem administrador), cria o atalho
-   no Menu Iniciar e oferece iniciar o dock junto com o Windows.
+1. Baixe o arquivo `PingoDock-Setup-<versão>.exe` em [Releases](../../releases/latest).
+2. Execute o instalador e siga o assistente. A instalação é por usuário e oferece a opção de iniciar o Pingo Dock junto com o Windows.
+3. Abra o Pingo Dock. Na primeira execução, o guia de boas-vindas explica como fixar aplicativos, trocar de janela e usar a barra superior.
 
-Requisitos: Windows 10 ou 11, 64 bits. Para desinstalar: *Configurações → Aplicativos → Pingo Dock*.
+O instalador é para Windows de 64 bits. Os recursos da 1.4 foram verificados no Windows 10. A integração com os painéis nativos, como a área de notificação, depende da versão do Windows.
 
-> **Já usava o MacDock?** É o nome antigo do Pingo Dock. Instale por cima: seus apps, a ordem e as
-> opções são mantidos, e o MacDock é removido.
+Para voltar à barra de tarefas do Windows, clique com o botão direito no Dock e escolha **Sair do Dock**. Para desinstalar, abra **Configurações → Aplicativos → Pingo Dock**.
+
+> Se você já usava o **MacDock**, pode instalar o Pingo Dock por cima. O instalador migra as preferências e remove a instalação antiga.
 
 <details>
-<summary>Instalação silenciosa (para vários PCs)</summary>
+<summary>Instalação silenciosa</summary>
 
-```
-PingoDock-Setup-1.3.0.exe /VERYSILENT /MERGETASKS="startup"
+```powershell
+PingoDock-Setup-1.4.2.exe /VERYSILENT /MERGETASKS="startup"
 ```
 
-Use `/MERGETASKS="!startup"` para não iniciar com o Windows.
+Use `/MERGETASKS="!startup"` para desativar a inicialização com o Windows.
+
 </details>
 
 ## Como usar
 
-| Para… | Faça |
+| Ação | Como fazer |
 |---|---|
-| Abrir um app ou trazer a janela para frente | Clique no ícone |
-| Fixar um app, pasta ou arquivo | Arraste do Explorador para o dock, ou clique direito → *Adicionar aplicativo…* |
-| Abrir um arquivo com um app do dock | Arraste o arquivo e solte **em cima** do ícone do app |
-| Ver as janelas de um app ou fechá-lo | Clique direito no ícone |
-| Mandar arquivos para a Lixeira | Solte-os em cima da Lixeira |
-| Reordenar | Arraste o ícone para os lados |
-| Remover | Arraste o ícone para cima e solte, ou clique direito → *Remover do Dock* |
-| Separar grupos de ícones | Clique direito → *Adicionar separador* |
-| Encurtar o nome de uma pasta | Clique direito → *Renomear…* |
-| Mostrar / esconder o dock | **Ctrl+Alt+D** |
-| Ter o dock nos dois (ou mais) monitores | Clique direito → *Mostrar em todas as telas* |
-| Mudar tema, desfoque, tamanho, ampliação | Clique direito no dock |
+| Fixar um aplicativo, pasta ou arquivo | Arraste do Explorador para o Dock ou use **Adicionar aplicativo…** no menu do Dock. |
+| Abrir um arquivo em um aplicativo | Solte o arquivo em cima do ícone do app correspondente. |
+| Reordenar itens ou adicionar um separador | Arraste os itens para os lados ou use **Adicionar separador** no menu do Dock. |
+| Remover um item fixado por você | Arraste-o para cima e solte ou use **Remover do Dock**. |
+| Fechar uma janela ou listar as janelas de um app | Clique com o botão direito no ícone do aplicativo. |
+| Usar a Lixeira | Arraste o arquivo até ela. Clique com o botão direito para esvaziá-la. |
+| Mostrar ou ocultar o Dock | Pressione **Ctrl+Alt+D**. |
+| Ativar o Dock em outros monitores | No menu do Dock, escolha **Mostrar em todas as telas**. |
+| Ajustar o visual | No menu do Dock, use **Aparência**, **Tamanho dos ícones** ou **Aparência da barra superior**. |
+| Rever o guia | Clique com o botão direito no Dock → **Como usar o Pingo Dock**. |
 
-**Dica:** para o visual ficar completo, ative *Ocultar automaticamente a barra de tarefas* em
-*Configurações → Personalização → Barra de tarefas*.
+<p align="center">
+  <img src="docs/print-boas-vindas-14.png" width="490" alt="Primeiro passo do guia de boas-vindas do Pingo Dock">
+</p>
 
-## Configuração
+O Dock amplia os ícones ao passar o mouse. Com uma janela maximizada, ele pode se recolher e reaparecer quando o cursor chega à borda inferior. O menu do Dock também permite ajustar a ampliação, o desfoque e a ocultação automática.
 
-As opções ficam em `%APPDATA%\PingoDock\config.json`. Quase tudo se ajusta pelo clique direito;
-algumas opções só existem no arquivo:
+## Configuração e suporte
 
-| Chave | Para quê |
-|---|---|
-| `"hotkey"` | Atalho de mostrar/esconder — ex.: `"Ctrl+Alt+D"`, `"Win+Shift+D"`, `"Ctrl+Alt+F9"` |
-| `"apps"` | Os itens do dock, na ordem (dá para editar os nomes à mão) |
+O Pingo Dock guarda as preferências em `%APPDATA%\PingoDock\config.json`. O arquivo contém o atalho (`hotkey`), os itens fixados (`apps`) e o estilo da barra superior (`top_bar_style`).
 
-A bolinha de "aberto" aparece quando o app tem alguma janela, mesmo minimizada. Para atalhos que
-abrem outro programa (lançadores, apps da Microsoft Store, Steam), o dock aprende sozinho qual é o
-processo real na primeira vez que você abre o app por ele.
-
-Algo estranho? O arquivo `dock.log`, na mesma pasta, registra quando e por que o dock se
-escondeu — anexe-o ao abrir uma *issue*.
+Ao relatar um problema em [Issues](../../issues), informe a versão do Pingo Dock e do Windows, descreva os passos para reproduzir e, se for relevante, anexe o `dock.log` dessa mesma pasta após revisar seu conteúdo.
 
 ## Desenvolvimento
 
-Feito em **Python 3.12** + **[PySide6](https://doc.qt.io/qtforpython-6/)** (Qt), com chamadas diretas
-à API do Windows via `ctypes`. O dock inteiro está em [`dock.py`](dock.py).
+O projeto usa **Python**, **PySide6** e APIs do Windows. A fonte padrão é **Poppins**, distribuída com o instalador e sua licença OFL.
 
-| Para… | Comando |
+| Ação | Comando ou arquivo |
 |---|---|
-| Rodar a partir do código | Dois cliques em `iniciar_dock.bat` (na 1ª vez cria o `.venv` e instala as dependências) |
-| Gerar o instalador (~17 MB) | `.venv\Scripts\python.exe installer\build.py` (requer `pip install pyinstaller` e `winget install JRSoftware.InnoSetup --scope user`) |
-| Conferir um build | `build\dist\PingoDock\PingoDock.exe --selftest` (resultado em `selftest.log`) |
-| Regerar os prints deste README | `.venv\Scripts\python.exe docs\gerar_prints.py` |
+| Criar o ambiente e iniciar o Dock a partir do código | `iniciar_dock.bat` |
+| Rodar a prévia do desktop com recarga automática | `.venv\Scripts\python.exe dev.py` |
+| Gerar o instalador com PyInstaller e Inno Setup 6 | `.venv\Scripts\python.exe installer\build.py` |
+| Executar o autoteste do pacote | `build\dist\PingoDock\PingoDock.exe --selftest` |
+| Capturar as telas do README | `.venv\Scripts\python.exe docs\gerar_prints.py` |
 
-A versão de desenvolvimento e a instalada não rodam ao mesmo tempo: feche uma
-(clique direito → *Sair do Dock*) antes de abrir a outra.
+Os prints foram capturados com o aplicativo em execução, usando um perfil temporário com dados de demonstração.
 
 ## Licença
 
-O Pingo Dock é **gratuito para uso não comercial**, sob a
-**[PolyForm Noncommercial License 1.0.0](LICENSE)**.
+O Pingo Dock é gratuito para **uso não comercial**, sob a [PolyForm Noncommercial License 1.0.0](LICENSE). Cópias e versões modificadas devem preservar a licença e o aviso de autoria **Copyright (c) 2026 Gabriel Nicolas**. Para uso comercial, entre em contato com o autor.
 
-| Pode ✅ | Não pode sem autorização ❌ |
-|---|---|
-| Usar no seu computador pessoal, nos estudos, como hobby | Vender o Pingo Dock ou versões dele |
-| Usar em ONGs, escolas, universidades, hospitais filantrópicos e órgãos públicos | Usar dentro de empresas com fins lucrativos (mesmo só internamente) |
-| Estudar o código, modificar e compartilhar (sem fins comerciais) | Incluir em produtos ou serviços pagos |
-| | Distribuir sem o aviso de autoria (`Required Notice` no topo do [LICENSE](LICENSE)) |
-
-Toda cópia ou versão modificada precisa manter o aviso **"Copyright (c) 2026 Gabriel Nicolas"** e a
-licença. Quer usar na sua empresa ou num produto? Entre em contato com o autor para uma licença
-comercial.
-
-> Por proibir o uso comercial, o Pingo Dock tem **código aberto para consulta e uso não comercial**,
-> mas não é "open source" na definição da OSI.
-
-O instalador também inclui o Qt/PySide6 (LGPL-3.0) e o Python (PSF), cada um com a sua própria
-licença — veja [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+As licenças de Poppins, Qt/PySide6 e Python estão listadas em [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ---
 
 <p align="center">
-  Feito por <a href="https://github.com/Nik0lax">Gabriel Nicolas</a> · parte da família <b>Pingo</b> 💧
+  Feito por <a href="https://github.com/Nik0lax">Gabriel Nicolas</a> · parte da família <b>Pingo</b>
 </p>
