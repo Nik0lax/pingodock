@@ -1,139 +1,197 @@
-"""Gera os prints do README (docs/print-escuro.png e docs/print-claro.png).
+"""Captura o Pingo Dock em execução, com um perfil temporário para documentação.
 
-Usa o código real de desenho do dock, com apps genéricos (nada da sua configuração)
-sobre um papel de parede abstrato nas cores do Pingo. O desfoque do Windows não
-aparece em renderização fora da tela, então o fundo atrás do painel é desfocado aqui.
-
-Uso:  .venv\\Scripts\\python.exe docs\\gerar_prints.py
+Uso: .venv\\Scripts\\python.exe docs\\gerar_prints.py
 """
-import math
+
 import os
+import subprocess
 import sys
+import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+os.environ["PINGODOCK_DEV"] = "1"
 
-import dock  # noqa: E402
-from PySide6.QtCore import QPoint, QPointF, QRectF, Qt  # noqa: E402
-from PySide6.QtGui import (QColor, QImage, QLinearGradient, QPainter, QPainterPath,  # noqa: E402
-                           QRadialGradient)
-from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
-
-WIDTH, HEIGHT, SCALE = 1280, 380, 2  # tamanho lógico e escala (2 = nítido em telas retina)
-
-
-def demo_config() -> dict:
-    windir = os.environ.get("WINDIR", r"C:\Windows")
-    pf = os.environ.get("ProgramFiles", r"C:\Program Files")
-    pf86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
-    local = os.environ.get("LOCALAPPDATA", "")
-    home = Path.home()
-    apps = [
-        ("Explorador de Arquivos", rf"{windir}\explorer.exe"),
-        ("Microsoft Edge", rf"{pf86}\Microsoft\Edge\Application\msedge.exe"),
-        ("Google Chrome", rf"{pf}\Google\Chrome\Application\chrome.exe"),
-        ("Visual Studio Code", rf"{local}\Programs\Microsoft VS Code\Code.exe"),
-        ("Bloco de Notas", rf"{windir}\System32\notepad.exe"),
-        ("PowerShell", rf"{windir}\System32\WindowsPowerShell\v1.0\powershell.exe"),
-    ]
-    items = [{"name": n, "path": p} for n, p in apps if os.path.exists(p)]
-    items.append({"type": "separator"})
-    items += [{"name": "Fotos", "path": str(home / "Pictures")},
-              {"name": "Música", "path": str(home / "Music")}]
-    items += [{"type": "separator"}, {"type": "trash"}]
-    cfg = dict(dock.DEFAULT_CONFIG)
-    cfg.update(icon_size=56, apps=items, trash_added=True, blur=True)
-    return cfg
+import dock
+from PySide6.QtCore import QPoint, QRect, Qt
+from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPixmap, QRadialGradient
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QWidget
 
 
-def wallpaper(light: bool) -> QImage:
-    img = QImage(WIDTH * SCALE, HEIGHT * SCALE, QImage.Format.Format_ARGB32_Premultiplied)
-    p = QPainter(img)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p.scale(SCALE, SCALE)
-    base = QLinearGradient(0, 0, WIDTH, HEIGHT)
-    if light:
-        base.setColorAt(0, QColor(226, 236, 255))
-        base.setColorAt(1, QColor(246, 230, 250))
-        blobs = [(180, 120, 260, QColor(120, 205, 255, 150)), (640, 60, 300, QColor(255, 170, 205, 130)),
-                 (1080, 160, 280, QColor(255, 196, 140, 140)), (420, 330, 240, QColor(175, 150, 255, 120))]
-    else:
-        base.setColorAt(0, QColor(10, 16, 44))
-        base.setColorAt(1, QColor(30, 16, 64))
-        blobs = [(180, 120, 260, QColor(40, 150, 255, 170)), (640, 60, 300, QColor(255, 90, 160, 120)),
-                 (1080, 160, 280, QColor(255, 150, 70, 120)), (420, 330, 240, QColor(140, 100, 255, 150))]
-    p.fillRect(QRectF(0, 0, WIDTH, HEIGHT), base)
-    for x, y, r, color in blobs:
-        g = QRadialGradient(QPointF(x, y), r)
-        g.setColorAt(0, color)
-        g.setColorAt(1, QColor(color.red(), color.green(), color.blue(), 0))
-        p.fillRect(QRectF(0, 0, WIDTH, HEIGHT), g)
-    p.end()
-    return img
+class DesktopBackground(QWidget):
+    def __init__(self, geometry):
+        super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+                         | Qt.WindowDoesNotAcceptFocus)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setGeometry(geometry)
+
+    def paintEvent(self, _event):
+        painter = QPainter(self)
+        width, height = self.width(), self.height()
+        base = QLinearGradient(0, 0, width, height)
+        base.setColorAt(0, QColor("#142640"))
+        base.setColorAt(1, QColor("#24213e"))
+        painter.fillRect(self.rect(), base)
+        for x, y, radius, ink in ((0.03, 0.86, 0.56, "#165b82"), (0.87, 0.26, 0.53, "#474082")):
+            gradient = QRadialGradient(width * x, height * y, width * radius)
+            gradient.setColorAt(0, QColor(ink))
+            gradient.setColorAt(1, Qt.transparent)
+            painter.fillRect(self.rect(), gradient)
 
 
-def blurred(img: QImage) -> QImage:
-    """Desfoque suave (reduz e amplia duas vezes), parecido com o do Windows."""
-    out = img
-    for factor in (14, 6):
-        small = out.scaled(out.width() // factor, out.height() // factor,
-                           Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
-        out = small.scaled(img.width(), img.height(), Qt.AspectRatioMode.IgnoreAspectRatio,
-                           Qt.TransformationMode.SmoothTransformation)
-    return out
+def wait_for(condition, milliseconds=6000):
+    until = time.monotonic() + milliseconds / 1000
+    while time.monotonic() < until:
+        if result := condition():
+            return result
+        QTest.qWait(60)
+    raise RuntimeError("Um elemento do Pingo Dock não ficou pronto para a captura.")
 
 
-def render(d: dock.Dock, light: bool, out: Path) -> None:
-    d.theme_name = "light" if light else "dark"
-    bg = wallpaper(light)
-    canvas = QImage(bg)
-    p = QPainter(canvas)
-    p.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
-    p.scale(SCALE, SCALE)
-    offset = QPoint((WIDTH - d.width()) // 2, HEIGHT - d.height())
-    panel = d.layout()[0].translated(offset)
-    # fundo desfocado atrás do painel (o que o Windows faz na tela)
-    clip = QPainterPath()
-    clip.addRoundedRect(panel, dock.PANEL_RADIUS, dock.PANEL_RADIUS)
-    p.save()
-    p.setClipPath(clip)
-    p.drawImage(QRectF(0, 0, WIDTH, HEIGHT), blurred(bg))
-    p.restore()
-    d.render(p, offset, renderFlags=QWidget.RenderFlag.DrawChildren)
-    p.end()
-    canvas.save(str(out))
-    print(f"gerado: {out}")
+def capture(screen, area, filename):
+    QTest.qWait(240)
+    pixmap = screen.grabWindow(0, area.x(), area.y(), area.width(), area.height())
+    if pixmap.isNull() or not pixmap.save(str(ROOT / "docs" / filename)):
+        raise RuntimeError(f"Não foi possível salvar {filename}")
+    print(filename)
 
 
-def main() -> None:
+def capture_start(group, screen):
+    leader = group.leader
+    launcher = leader.start_launcher = dock.StartLauncher(leader)
+    launcher.account_name = "Usuário"
+    launcher.account_photo = QPixmap()
+    shortcuts = launcher.start_shortcuts()
+    folders = [entry for entry in shortcuts if entry[0] and "acess" in entry[0][0].casefold()]
+    apps = [((), entry["name"], entry["path"]) for entry in dock.default_apps()]
+    launcher.entries = folders + apps
+    if folders:
+        launcher.expanded_folders.add(folders[0][0][:1])
+    launcher.catalog_state = "ready"
+    launcher.catalog_loaded_at = time.monotonic()
+    leader.toggle_start_launcher()
+    QTest.qWait(150)
+    first_section = launcher.apps.topLevelItem(0)
+    first_folder = first_section.child(0) if first_section is not None else None
+    if first_folder is not None and first_folder.childCount():
+        first_folder.setExpanded(True)
+    wait_for(lambda: any(icon.cacheKey() != launcher.generic_icon.cacheKey()
+                         for icon in launcher.icons.values()))
+    capture(screen, launcher.geometry().adjusted(-14, -14, 14, 14), "print-iniciar-14.png")
+    launcher.close()
+
+
+def capture_previews(group, screen, temp):
+    widget = group.leader
+    item = next(entry for entry in group.items if isinstance(entry, dock.DockItem)
+                and "notepad.exe" in entry.match_names)
+    files = {
+        "Planejamento.txt": "Pingo Dock\n\nPlanejamento da versão\n\n"
+                             "• Revisar o guia de boas-vindas\n• Conferir os atalhos\n• Testar a barra superior",
+        "Notas.txt": "Notas da versão 1.4\n\nMenu Iniciar com busca\n"
+                     "Prévia das janelas abertas\nControles na barra superior",
+    }
+    processes = []
+
+    def find_windows():
+        pids = {process.pid for process in processes}
+        windows = [hwnd for hwnd, pid in dock.app_windows()
+                   if pid in pids and any(Path(name).stem in dock.window_title(hwnd) for name in files)]
+        return windows if len(windows) == len(files) else None
+
+    try:
+        for name, contents in files.items():
+            path = temp / name
+            path.write_text(contents, encoding="utf-8-sig")
+            processes.append(subprocess.Popen([item.target, str(path)]))
+        windows = wait_for(find_windows)
+        for hwnd in windows:
+            dock.user32.SetWindowPos(hwnd, None, 0, 0, 680, 620,
+                                     dock.SWP_NOMOVE | dock.SWP_NOACTIVATE | 0x0004)
+        QTest.qWait(180)
+        item.running = True
+        index = group.items.index(item)
+        thumb = widget.layout()[1][index]
+        anchor = widget.mapToGlobal(QPoint(round(thumb.center().x()), round(thumb.top())))
+        previews = dock.WindowPreviews(widget, item, tuple(windows), anchor)
+        try:
+            QTest.qWait(180)
+            previews.peek.show_window(windows[0], screen.geometry(), previews.geometry().top())
+            wait_for(previews.peek.isVisible)
+            region = previews.geometry().united(previews.peek.geometry())
+            capture(screen, region.adjusted(-14, -14, 14, 14), "print-janelas-14.png")
+        finally:
+            previews.clear_thumbnails()
+            previews.close()
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=5)
+
+
+def main():
     app = QApplication(sys.argv[:1])
-    cfg = demo_config()
-    dock.load_config = lambda: dict(cfg)
-    dock.Dock.save = lambda self: None  # nunca grava configuração
-    d = dock.Dock()
-    d.slow_timer.stop(); d.cover_timer.stop(); d.anim_timer.stop()
+    app.setStyle("Fusion")
+    dock.configure_ui_font(app)
+    screen = app.primaryScreen()
+    desktop = DesktopBackground(screen.geometry())
+    desktop.show()
+    with tempfile.TemporaryDirectory() as temporary:
+        temp = Path(temporary)
+        dock.CONFIG_PATH = temp / "config.json"
+        dock.save_config({**dock.DEFAULT_CONFIG, "apps": dock.default_apps(), "theme": "dark",
+                          "top_bar_style": "glass", "welcome_seen": True})
+        group = dock.DockGroup()
+        group.build()
+        for widget in group.docks:
+            for timer in (widget.anim_timer, widget.slow_timer, widget.cover_timer):
+                timer.stop()
+        bar = group.top_bar = dock.TopBar(group)
+        bar.show()
+        try:
+            group.show_welcome()
+            group.welcome.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+            group.welcome.show()
+            group.welcome.raise_()
+            wait_for(group.welcome.isVisible)
+            capture(screen, screen.geometry(), "print-desktop-14.png")
+            guide = group.welcome
+            capture(screen, guide.geometry().adjusted(-14, -14, 14, 14), "print-boas-vindas-14.png")
+            guide.close()
+            capture_start(group, screen)
+            capture_previews(group, screen, temp)
 
-    # ícones na resolução da imagem final (mais nítidos que os da tela)
-    px = math.ceil(d.S * d.M * SCALE)
-    for it in d.items:
-        if not it.is_sep:
-            it.reload_icon(d.provider, px)
-    # apps "abertos" (bolinha) e o mouse sobre o VS Code (ampliação + nome)
-    for it in d.items:
-        if not it.is_sep and it.name in ("Explorador de Arquivos", "Google Chrome", "Visual Studio Code"):
-            it.running = True
-    d.reveal, d.hover = 1.0, 0.0
-    rects = d.layout()[1]
-    target = next((i for i, it in enumerate(d.items) if getattr(it, "name", "") == "Visual Studio Code"), 3)
-    pointer = QPoint(int(rects[target].center().x()), int(rects[target].center().y()))
-    d.mouse_x, d.hover = float(pointer.x()), 1.0
-    dock.QCursor = type("Cursor", (), {"pos": staticmethod(lambda: d.mapToGlobal(pointer))})
+            bar.set_surface("white")
+            bar.volume.toggle_popup()
+            popup = bar.volume.popup
+            origin = bar.geometry().topLeft()
+            area = QRect(origin.x(), origin.y(), 227, popup.geometry().bottom() - origin.y() + 15)
+            capture(screen, area, "print-volume-14.png")
+            popup.close()
 
-    docs = ROOT / "docs"
-    render(d, False, docs / "print-escuro.png")
-    render(d, True, docs / "print-claro.png")
-    app.quit()
+            bar.open_tray()
+            wait_for(bar.tray_appearance.isVisible)
+            QTest.qWait(300)
+            panel = bar.tray_appearance.geometry()
+            if bar.promoted_tray.isVisible():
+                panel = panel.united(bar.promoted_tray.geometry())
+            panel.setTop(bar.y())
+            panel.setRight(bar.geometry().right())
+            panel.adjust(-13, 0, 0, 13)
+            capture(screen, panel, "print-bandeja-14.png")
+        finally:
+            native_popup = dock.user32.FindWindowW("NotifyIconOverflowWindow", None)
+            if native_popup and dock.user32.IsWindowVisible(native_popup):
+                bar.open_tray()
+                QTest.qWait(150)
+            bar.restore_tray_style()
+            bar.close()
+            group.close_docks()
+            desktop.close()
 
 
 if __name__ == "__main__":
