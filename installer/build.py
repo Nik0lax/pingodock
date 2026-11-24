@@ -26,12 +26,12 @@ INSTALLER = ROOT / "installer"
 BUILD = ROOT / "build"
 APP = BUILD / "dist" / "PingoDock"
 ICON = INSTALLER / "pingodock.ico"
+FONTS = ROOT / "assets" / "fonts" / "poppins"
 
 # Partes do Qt/Python que entram de carona mas o dock não usa (~60 MB).
 UNUSED = [
     "PySide6/opengl32sw.dll",            # OpenGL por software (o dock não usa OpenGL)
     "PySide6/translations",              # janelas de arquivo são as nativas do Windows
-    "PySide6/Qt6Network.dll", "PySide6/QtNetwork.pyd",
     "PySide6/Qt6Pdf.dll", "PySide6/Qt6OpenGL.dll", "PySide6/Qt6VirtualKeyboard.dll",
     "PySide6/Qt6Quick.dll", "PySide6/Qt6Qml.dll", "PySide6/Qt6QmlMeta.dll",
     "PySide6/Qt6QmlModels.dll", "PySide6/Qt6QmlWorkerScript.dll",
@@ -42,7 +42,7 @@ UNUSED = [
     "PySide6/plugins/imageformats/qpdf.dll", "PySide6/plugins/imageformats/qgif.dll",
     "PySide6/plugins/imageformats/qicns.dll", "PySide6/plugins/imageformats/qtga.dll",
     "PySide6/plugins/imageformats/qtiff.dll", "PySide6/plugins/imageformats/qwbmp.dll",
-    "PySide6/plugins/imageformats/qwebp.dll", "PySide6/plugins/imageformats/qjpeg.dll",
+    "PySide6/plugins/imageformats/qwebp.dll",
     "libcrypto-3.dll", "libcrypto-3-x64.dll", "libssl-3-x64.dll", "_hashlib.pyd",
     "_bz2.pyd", "_lzma.pyd",  # (_socket/select ficam: atualização por http)
 ]
@@ -65,13 +65,25 @@ def find_iscc() -> Path:
     sys.exit("Inno Setup 6 não encontrado. Instale com:  winget install JRSoftware.InnoSetup --scope user")
 
 
+def build_taskbar_guard(destination: Path) -> None:
+    zig = os.environ.get("PINGODOCK_ZIG") or shutil.which("zig")
+    if not zig:
+        sys.exit("Zig não encontrado. Inclua zig.exe no PATH ou defina PINGODOCK_ZIG.")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    run(zig, "cc", "-target", "x86_64-windows-gnu", "-std=c11", "-Os", "-s",
+        "-municode", "-Wl,--subsystem,windows", INSTALLER / "taskbar_guard.c", "-o", destination)
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     py = sys.executable
+    guard = BUILD / "native" / "PingoDockTaskbar.exe"
+    build_taskbar_guard(guard)
     run(py, INSTALLER / "make_icon.py", ICON)
 
     run(py, "-m", "PyInstaller", "--noconfirm", "--clean", "--windowed",
         "--name", "PingoDock", "--icon", ICON,
+        "--add-data", f"{FONTS}:assets/fonts/poppins",
         "--distpath", BUILD / "dist", "--workpath", BUILD / "work", "--specpath", BUILD,
         "--exclude-module", "tkinter", "--exclude-module", "unittest",
         "--exclude-module", "pydoc", "--exclude-module", "xmlrpc",
@@ -79,6 +91,7 @@ def main() -> None:
         ROOT / "dock.py")
 
     internal = APP / "_internal"
+    shutil.copy2(guard, APP / guard.name)
     before = sum(f.stat().st_size for f in APP.rglob("*") if f.is_file())
     for rel in UNUSED:
         target = internal / rel
@@ -86,6 +99,11 @@ def main() -> None:
             shutil.rmtree(target)
         elif target.exists():
             target.unlink()
+    # O Windows 10/11 já fornece ICU e UCRT compatíveis com as APIs do sistema.
+    # Cópias coletadas de outros programas podem ocultar as DLLs corretas.
+    for pattern in ("api-ms-win-*.dll", "ucrtbase.dll", "icuuc.dll", "icudt*.dll"):
+        for dll in internal.glob(pattern):
+            dll.unlink()
     after = sum(f.stat().st_size for f in APP.rglob("*") if f.is_file())
     print(f"pacote: {before / 2**20:.0f} MB → {after / 2**20:.0f} MB")
 

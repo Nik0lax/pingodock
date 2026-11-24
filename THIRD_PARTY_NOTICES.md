@@ -15,7 +15,14 @@ que **não** é alterada pela licença do Pingo Dock.
   (`_internal\PySide6\*.dll` na pasta de instalação). Você pode substituí-las por outra versão
   compatível do Qt/PySide6, conforme permite a LGPL.
 
-## Python 3.12
+## Poppins
+
+- Copyright © The Poppins Project Authors (Indian Type Foundry).
+- Licença: **SIL Open Font License 1.1**. Texto incluído em
+  `_internal/assets/fonts/poppins/OFL.txt`.
+- [Código-fonte da fonte](https://github.com/itfoundry/Poppins).
+
+## Python
 
 - Copyright © Python Software Foundation.
 - Licença: **PSF License Agreement**. Texto completo em [licenses/Python-PSF.txt](licenses/Python-PSF.txt).

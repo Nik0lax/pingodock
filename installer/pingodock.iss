@@ -18,6 +18,7 @@ AppId={{8C1E6F2B-4C1A-4E7E-9E1D-2B6B8E3A9F41}
 AppName={#AppTitle}
 AppVersion={#AppVersion}
 AppVerName={#AppTitle} {#AppVersion}
+VersionInfoVersion={#AppVersion}
 AppPublisher=Pingo
 ; Instala só para o usuário atual: não precisa de administrador.
 PrivilegesRequired=lowest
@@ -102,5 +103,6 @@ begin
        ewWaitUntilTerminated, ResultCode);
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /im {#LegacyName}.exe', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);
+  Sleep(500); { Permite que o processo auxiliar restaure a barra e encerre. }
   Result := '';
 end;

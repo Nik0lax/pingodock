@@ -119,8 +119,8 @@ def capture_previews(group, screen, temp):
         previews = dock.WindowPreviews(widget, item, tuple(windows), anchor)
         try:
             QTest.qWait(180)
-            previews.peek.show_window(windows[0], screen.geometry(), previews.geometry().top())
-            wait_for(previews.peek.isVisible)
+            previews.show_peek(windows[0])
+            wait_for(lambda: previews.peek is not None and previews.peek.isVisible())
             region = previews.geometry().united(previews.peek.geometry())
             capture(screen, region.adjusted(-14, -14, 14, 14), "print-janelas-14.png")
         finally:
@@ -174,21 +174,15 @@ def main():
             popup.close()
 
             bar.open_tray()
-            wait_for(bar.tray_appearance.isVisible)
+            wait_for(bar.background_tray.isVisible)
             QTest.qWait(300)
-            panel = bar.tray_appearance.geometry()
-            if bar.promoted_tray.isVisible():
-                panel = panel.united(bar.promoted_tray.geometry())
+            panel = bar.background_tray.geometry()
             panel.setTop(bar.y())
             panel.setRight(bar.geometry().right())
             panel.adjust(-13, 0, 0, 13)
             capture(screen, panel, "print-bandeja-14.png")
         finally:
-            native_popup = dock.user32.FindWindowW("NotifyIconOverflowWindow", None)
-            if native_popup and dock.user32.IsWindowVisible(native_popup):
-                bar.open_tray()
-                QTest.qWait(150)
-            bar.restore_tray_style()
+            bar.reset_tray_session()
             bar.close()
             group.close_docks()
             desktop.close()
