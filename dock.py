@@ -40,6 +40,7 @@ from collections import Counter, OrderedDict
 from ctypes import wintypes
 from pathlib import Path
 
+from peripheral_battery import connected_batteries
 from tray_host import TrayHost, explorer_taskbar
 
 
@@ -96,7 +97,7 @@ from PySide6.QtWidgets import (
 
 APP_NAME = "PingoDock"     # nome técnico: executável, pastas, registro
 APP_TITLE = "Pingo Dock"   # nome que aparece para o usuário
-APP_VERSION = "1.4.6"  # o build.py lê daqui a versão do instalador
+APP_VERSION = "1.4.7"  # o build.py lê daqui a versão do instalador
 FROZEN = getattr(sys, "frozen", False)  # rodando como PingoDock.exe (instalado)
 APP_DIR = Path(__file__).resolve().parent
 DEV_MODE = not FROZEN and os.environ.get("PINGODOCK_DEV") == "1"
@@ -2206,6 +2207,8 @@ class StartLauncher(QWidget):
         self.search.returnPressed.connect(self.select_search_result)
         self.apps.itemActivated.connect(self.activate_entry)
         self.apps.itemClicked.connect(self.activate_entry)
+        self.apps.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.apps.customContextMenuRequested.connect(self.show_app_menu)
         self.apps.itemExpanded.connect(self.decorate_visible)
         self.apps.itemExpanded.connect(lambda item: self.remember_folder(item, True))
         self.apps.itemCollapsed.connect(lambda item: self.remember_folder(item, False))
@@ -2644,6 +2647,50 @@ class StartLauncher(QWidget):
         except OSError:
             self.status.setText(f"Não foi possível abrir {item.text(0)}.")
             self.status.show()
+        else:
+            self.close()
+
+    def show_app_menu(self, point):
+        item = self.apps.itemAt(point)
+        if item is None:
+            return
+        target = item.data(0, Qt.UserRole)
+        if not target:
+            return
+        command = self.elevation_command(target)
+        if command is None:
+            return
+
+        self.apps.setCurrentItem(item)
+        menu = QMenu(self)
+        menu.setStyleSheet(self.dock.pal["menu"])
+        run_as_admin = menu.addAction("Executar como administrador")
+        name = item.text(0)
+        selected = menu.exec(self.apps.viewport().mapToGlobal(point))
+        menu.deleteLater()
+        if selected == run_as_admin:
+            self.launch_elevated(name, command)
+
+    @staticmethod
+    def elevation_command(target):
+        args, workdir = "", ""
+        if target.casefold().endswith(".lnk"):
+            shortcut = parse_shortcut(target)
+            target = shortcut["target"] or QFileInfo(target).symLinkTarget()
+            args, workdir = shortcut["args"], shortcut["workdir"]
+        if (not target.casefold().endswith(".exe") or not os.path.isabs(target)
+                or not os.path.isfile(target)):
+            return None
+        return target, args, workdir or os.path.dirname(target)
+
+    def launch_elevated(self, name, command):
+        executable, args, workdir = command
+        try:
+            os.startfile(executable, "runas", arguments=args, cwd=workdir)
+        except OSError as error:
+            if getattr(error, "winerror", None) != 1223:  # confirmação do UAC cancelada
+                self.status.setText(f"Não foi possível executar {name} como administrador.")
+                self.status.show()
         else:
             self.close()
 
@@ -4849,6 +4896,67 @@ class BluetoothButton(QToolButton):
             log(f"não foi possível abrir as configurações de Bluetooth: {error}")
 
 
+class PeripheralBattery(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.icon = QLabel()
+        self.level = QLabel()
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+        layout.addWidget(self.icon)
+        layout.addWidget(self.level)
+        self.hide()
+
+    def display(self, name, kind, percent, light):
+        ink = QColor("#252a32" if light else "#ffffff")
+        low = "#ae252d" if light else "#ffaaaa"
+        self.level.setStyleSheet(f"color: {low};" if percent <= 20 else "")
+        self.level.graphicsEffect().setColor(QColor(0, 0, 0, 45 if light else 230))
+        self.level.setText(f"{percent}%")
+        self.setToolTip(f"{name} · {percent}%")
+        self.setAccessibleName(f"{name}, bateria {percent}%")
+        pixmap = QPixmap(32, 32)
+        pixmap.setDevicePixelRatio(2)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(QPen(ink, 1.45, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        if kind == "headphones":
+            painter.drawArc(QRectF(2.3, 2.4, 11.4, 11.4), 0, 180 * 16)
+            painter.drawRoundedRect(QRectF(2.3, 8, 3.1, 5.3), 1.25, 1.25)
+            painter.drawRoundedRect(QRectF(10.6, 8, 3.1, 5.3), 1.25, 1.25)
+        elif kind == "mouse":
+            painter.drawRoundedRect(QRectF(4, 1.75, 8, 12.5), 4, 4)
+            painter.drawLine(QPointF(8, 4), QPointF(8, 6))
+        elif kind == "keyboard":
+            painter.drawRoundedRect(QRectF(1.5, 4, 13, 8), 1.5, 1.5)
+            for x in (4, 7, 10, 12):
+                painter.drawPoint(QPointF(x, 6.5))
+            painter.drawLine(QPointF(5, 9.5), QPointF(11, 9.5))
+        elif kind == "gamepad":
+            outline = QPainterPath(QPointF(5, 4.5))
+            outline.lineTo(11, 4.5)
+            outline.cubicTo(13.5, 4.5, 14.3, 7.5, 14.9, 10.3)
+            outline.cubicTo(15.5, 13, 12.7, 13.7, 11, 10.7)
+            outline.lineTo(5, 10.7)
+            outline.cubicTo(3.3, 13.7, .5, 13, 1.1, 10.3)
+            outline.cubicTo(1.7, 7.5, 2.5, 4.5, 5, 4.5)
+            outline.closeSubpath()
+            painter.drawPath(outline)
+            painter.drawLine(QPointF(3.8, 7.7), QPointF(6.2, 7.7))
+            painter.drawLine(QPointF(5, 6.5), QPointF(5, 8.9))
+            painter.drawPoint(QPointF(10.6, 7.2))
+            painter.drawPoint(QPointF(12, 8.5))
+        else:
+            painter.drawRoundedRect(QRectF(2, 3, 12, 8), 1.5, 1.5)
+            painter.drawLine(QPointF(6, 13), QPointF(10, 13))
+        painter.end()
+        icon = status_icon_with_shadow(pixmap, 0.2 if light else 1.0)
+        self.icon.setPixmap(icon.pixmap(QSize(18, 18), self.devicePixelRatioF()))
+        self.show()
+
+
 class DesktopButton(QToolButton):
     def __init__(self):
         super().__init__()
@@ -4970,6 +5078,11 @@ class TopBar(QWidget):
             indicators.addWidget(indicator)
         indicators.addWidget(self.volume)
         indicators.addWidget(self.bluetooth)
+        self.peripherals = [PeripheralBattery() for _ in range(3)]
+        self.peripheral_readings = []
+        for battery in self.peripherals:
+            self.add_shadow(battery.level)
+            indicators.addWidget(battery)
         indicators.addStretch()
         layout.addLayout(indicators, 0, 0)
         self.clock = QLabel()
@@ -5079,6 +5192,8 @@ class TopBar(QWidget):
         return AppBarData(ctypes.sizeof(AppBarData), int(self.winId()), APPBAR_CALLBACK, ABE_TOP)
 
     def reserve_work_area(self):
+        if not self.work_area_enabled:
+            return
         native = explorer_taskbar()
         native_visible = bool(native and user32.IsWindowVisible(native))
         if not self.appbar_registered and native_visible and time.monotonic() < self.work_area_deadline:
@@ -5088,6 +5203,7 @@ class TopBar(QWidget):
         if not self.appbar_registered:
             self.appbar_registered = bool(shell32.SHAppBarMessage(ABM_NEW, ctypes.byref(data)))
             if not self.appbar_registered:
+                self.appbar_timer.start(750)
                 return
         monitor = user32.MonitorFromWindow(data.window, MONITOR_DEFAULTTONEAREST)
         info = MONITORINFO()
@@ -5098,6 +5214,7 @@ class TopBar(QWidget):
         bounds = info.rcMonitor
         data.rect = wintypes.RECT(bounds.left, bounds.top, bounds.right, bounds.top + height)
         shell32.SHAppBarMessage(ABM_QUERYPOS, ctypes.byref(data))
+        align_with_hidden_taskbar = False
         visual_top = data.rect.top
         # O Explorer pode manter a reserva da barra nativa mesmo após ocultá-la.
         native_rect = wintypes.RECT()
@@ -5105,14 +5222,21 @@ class TopBar(QWidget):
                 and user32.GetWindowRect(native, ctypes.byref(native_rect))
                 and native_rect.top == bounds.top and native_rect.left <= bounds.left
                 and native_rect.right >= bounds.right and data.rect.top <= native_rect.bottom):
+            align_with_hidden_taskbar = True
             visual_top = bounds.top
         data.rect.bottom = max(data.rect.top + 1, visual_top + height)
         requested = (data.rect.left, data.rect.top, data.rect.right, data.rect.bottom, visual_top)
         if requested == self.appbar_position:
+            if self.appbar_native_visible != native_visible:
+                self.appbar_native_visible = native_visible
+                QTimer.singleShot(150, self.fit_overlapping_windows)
             return
         if not shell32.SHAppBarMessage(ABM_SETPOS, ctypes.byref(data)):
+            self.appbar_timer.start(750)
             return
         r = data.rect
+        if not align_with_hidden_taskbar:
+            visual_top = r.top
         self.appbar_position = requested
         self.appbar_native_visible = native_visible
         self.appbar_rect = (r.left, visual_top, r.right, visual_top + height)
@@ -5127,21 +5251,36 @@ class TopBar(QWidget):
         native = explorer_taskbar()
         if bool(native and user32.IsWindowVisible(native)) != self.appbar_native_visible:
             return
-        _, top, _, bottom = self.appbar_rect
-        monitor = user32.MonitorFromWindow(int(self.winId()), MONITOR_DEFAULTTONEAREST)
         for hwnd, pid in app_windows():
-            if (pid == os.getpid() or user32.IsIconic(hwnd) or user32.IsZoomed(hwnd)
-                    or user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) != monitor
-                    or user32.GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CAPTION != WS_CAPTION):
-                continue
-            outer, frame = wintypes.RECT(), wintypes.RECT()
-            if not user32.GetWindowRect(hwnd, ctypes.byref(outer)):
-                continue
-            if dwmapi.DwmGetWindowAttribute(hwnd, 9, ctypes.byref(frame), ctypes.sizeof(frame)) != 0:
-                frame = outer
-            if frame.top < bottom and frame.bottom > top:
-                user32.SetWindowPos(hwnd, None, outer.left, outer.top + bottom - frame.top, 0, 0,
-                                    SWP_NOSIZE | SWP_NOACTIVATE | 0x0004)
+            if pid != os.getpid():
+                self.fit_window_under_bar(hwnd)
+
+    def fit_window_under_bar(self, hwnd):
+        if not self.appbar_rect or not self.isVisible() or user32.IsIconic(hwnd):
+            return
+        monitor = user32.MonitorFromWindow(int(self.winId()), MONITOR_DEFAULTTONEAREST)
+        if user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) != monitor:
+            return
+        maximized = bool(user32.IsZoomed(hwnd))
+        if not maximized and user32.GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CAPTION != WS_CAPTION:
+            return
+        left, top, right, bottom = self.appbar_rect
+        outer, frame = wintypes.RECT(), wintypes.RECT()
+        if not user32.GetWindowRect(hwnd, ctypes.byref(outer)):
+            return
+        if dwmapi.DwmGetWindowAttribute(hwnd, 9, ctypes.byref(frame), ctypes.sizeof(frame)) != 0:
+            frame = outer
+        if frame.top >= bottom - 1 or frame.bottom <= top or frame.right <= left or frame.left >= right:
+            return
+        offset = bottom - frame.top
+        height = outer.bottom - outer.top - offset
+        if maximized and height <= 0:
+            return
+        flags = SWP_NOACTIVATE | 0x0004  # SWP_NOZORDER
+        if not maximized:
+            flags |= SWP_NOSIZE
+        user32.SetWindowPos(hwnd, None, outer.left, outer.top + offset,
+                            outer.right - outer.left, height, flags)
 
     def release_work_area(self):
         self.appbar_timer.stop()
@@ -5204,8 +5343,11 @@ class TopBar(QWidget):
             self.volume.popup.close()
             self.reset_tray_session()
             self.hide()
-        elif not fullscreen and not self.isVisible():
-            self.show()
+        elif not fullscreen:
+            if not self.isVisible():
+                self.show()
+            if self.appbar_native_visible == native_visible and user32.IsZoomed(hwnd):
+                self.fit_window_under_bar(hwnd)
 
     def add_surface_menu(self, menu, style):
         surface_menu = menu.addMenu("Aparência da barra superior")
@@ -5243,6 +5385,7 @@ class TopBar(QWidget):
             widget.graphicsEffect().setColor(QColor(0, 0, 0, 45 if light else 230))
         self.volume.setIcon(self.volume.volume_icon())
         self.bluetooth.refresh_icon()
+        self.display_peripheral_batteries()
         self.desktop.refresh_icon()
 
         chevron = QPixmap(32, 32)
@@ -5282,6 +5425,9 @@ class TopBar(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        # Substitui o fundo da área invalidada por completo, inclusive o alfa.
+        # Os indicadores mudam de largura quando um periférico entra ou sai.
+        painter.setCompositionMode(QPainter.CompositionMode_Source)
         if self.surface == "black":
             painter.fillRect(event.rect(), Qt.black)
         elif self.surface == "white":
@@ -5290,6 +5436,7 @@ class TopBar(QWidget):
             palette = THEMES["dark"]
             blurred = self.surface_blur is not None and self.surface_blur.blur_on
             painter.fillRect(event.rect(), palette["panel_blur" if blurred else "panel"])
+            painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
             highlight = QLinearGradient(0, 0, 0, self.height())
             highlight.setColorAt(0, palette["grad_top"])
             highlight.setColorAt(1, palette["grad_bottom"])
@@ -5300,13 +5447,18 @@ class TopBar(QWidget):
             painter.fillRect(event.rect(), QColor(0, 0, 0, 1))
 
     def contextMenuEvent(self, event):
+        event.accept()
+        self.context_point = event.globalPos()
+        if sys.getwindowsversion().build >= 22000:
+            self.show_taskbar_actions()
+            return
         taskbar = explorer_taskbar()
         if not taskbar:
-            event.ignore()
+            self.show_taskbar_actions()
             return
         rect = wintypes.RECT()
         if not user32.GetWindowRect(int(self.winId()), ctypes.byref(rect)):
-            event.ignore()
+            self.show_taskbar_actions()
             return
         scale = self.devicePixelRatio()
         x = rect.left + round(event.pos().x() * scale)
@@ -5317,9 +5469,26 @@ class TopBar(QWidget):
             self.context_opened = False
             self.context_deadline = time.monotonic() + 1
             self.context_timer.start()
-            event.accept()
         else:
-            event.ignore()
+            self.show_taskbar_actions()
+
+    def show_taskbar_actions(self):
+        menu = QMenu(self)
+        menu.setStyleSheet(MENU_STYLE_LIGHT if self.surface == "white" else MENU_STYLE)
+        menu.addAction("Gerenciador de Tarefas", lambda: self.open_taskbar_action("taskmgr.exe"))
+        menu.addAction("Configurações da barra de tarefas",
+                       lambda: self.open_taskbar_action("ms-settings:taskbar"))
+        try:
+            menu.exec(self.context_point)
+        finally:
+            menu.deleteLater()
+
+    @staticmethod
+    def open_taskbar_action(target):
+        try:
+            os.startfile(target)
+        except OSError as error:
+            log(f"não foi possível abrir {target}: {error}")
 
     def dismiss_native_menu(self):
         owner_thread = user32.GetWindowThreadProcessId(self.context_owner, None)
@@ -5339,8 +5508,11 @@ class TopBar(QWidget):
                 return
 
         if not visible:
-            if self.context_opened or time.monotonic() >= self.context_deadline:
+            if self.context_opened:
                 self.context_timer.stop()
+            elif time.monotonic() >= self.context_deadline:
+                self.context_timer.stop()
+                self.show_taskbar_actions()
             return
 
         self.context_opened = True
@@ -5354,7 +5526,21 @@ class TopBar(QWidget):
         now = QDateTime.currentDateTime()
         self.clock.setText(self.locale.toString(now, "ddd d 'de' MMM  ·  HH:mm"))
 
+    def display_peripheral_batteries(self):
+        for index, indicator in enumerate(self.peripherals):
+            if index < len(self.peripheral_readings):
+                indicator.display(*self.peripheral_readings[index], light=self.surface == "white")
+            else:
+                indicator.hide()
+        levels = [f"{name} · {percent}%" for name, _, percent in self.peripheral_readings]
+        self.bluetooth.setToolTip("\n".join(["Abrir configurações de Bluetooth", *levels]))
+        self.update()
+
     def refresh_status(self):
+        readings = connected_batteries()
+        if readings != self.peripheral_readings:
+            self.peripheral_readings = readings
+            self.display_peripheral_batteries()
         status = PowerStatus()
         has_level = ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status)) and status.percent <= 100
         self.battery.setVisible(bool(has_level))

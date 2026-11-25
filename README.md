@@ -20,6 +20,13 @@
 
 O **Pingo Dock 1.4** substitui visualmente a barra de tarefas do Windows enquanto está em execução. O Dock reúne os aplicativos fixados e abertos na base da tela. A barra superior concentra a data, a hora e os controles do sistema.
 
+## Novidades da versão 1.4.7
+
+- **Bateria dos periféricos Bluetooth na barra superior.** Fone, mouse, teclado e controle de jogos aparecem com ícone e porcentagem quando o Windows informa a carga.
+- **Executar como administrador.** Clique com o botão direito em um executável ou atalho compatível no Iniciar para abrir a confirmação do Windows.
+- **Janelas maximizadas.** O Pingo ajusta janelas que avançam sobre a área reservada para a barra superior.
+- **Menu da barra superior.** No Windows 11, o clique direito abre o menu do Pingo com o Gerenciador de Tarefas e as configurações da barra. No Windows 10, esse menu fica disponível quando o menu nativo falha.
+
 ## Novidades da versão 1.4.6
 
 - **Bandeja própria com os menus originais dos apps.** O Pingo recebe os registros de ícones, separa **Sistema** e **Aplicativos** e encaminha o clique ao aplicativo dono do ícone. A lista se atualiza enquanto o painel está aberto e tenta se recuperar após reinício do Explorer ou retorno da suspensão.
@@ -110,7 +117,7 @@ Para voltar à barra de tarefas do Windows, clique com o botão direito no Dock 
 <summary>Instalação silenciosa</summary>
 
 ```powershell
-PingoDock-Setup-1.4.6.exe /VERYSILENT /MERGETASKS="startup"
+PingoDock-Setup-1.4.7.exe /VERYSILENT /MERGETASKS="startup"
 ```
 
 Use `/MERGETASKS="!startup"` para desativar a inicialização com o Windows.
